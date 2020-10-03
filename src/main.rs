@@ -95,9 +95,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stdin = io::stdin();
     stdin.read_to_string(&mut buffer).await?;
     let hosts: Vec<String> = buffer.lines().map(str::to_owned).collect();
-    let mut response_code = 0;
 
     futures::stream::iter(hosts.into_iter().map(|host| async move {
+        let mut response_code = 0;
         let mut protocol = String::new();
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(timeout))
