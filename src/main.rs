@@ -20,13 +20,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short("t")
                 .long("threads")
                 .takes_value(true)
-                .help("Number of threads. Default: 500"),
+                .help("Number of threads. Default: 100"),
         )
         .arg(
             Arg::with_name("timeout")
                 .long("timeout")
                 .takes_value(true)
-                .help("Timeout in seconds. Default: 1"),
+                .help("Timeout in seconds. Default: 2"),
         )
         .arg(
             Arg::with_name("user-agent")
