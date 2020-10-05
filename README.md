@@ -21,7 +21,7 @@ Download the asset from the [releases page](https://github.com/Edu4rdSHL/fhc/rel
 
 ## Using the source code.
 
-1. You need to have the lastest stable [Rust](https://www.rust-lang.org/) version insalled in your system.
+1. You need to have the latest stable [Rust](https://www.rust-lang.org/) version installed in your system.
 2. Clone the repo or download the source code, then run `cargo build --release`.
 3. Execute the tool from `./target/release/fhc` or add it to your system PATH to use from anywhere.
 
