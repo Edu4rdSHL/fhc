@@ -11,6 +11,8 @@ FHC try to resolve https first, if this fails then fallback to http, in that way
 FHC is **very** resource friendly, you can use up to 1000 threads in an single core machine and this will work without any problem, the bottleneck for this tool is your network speed. By default, FHC is able to perform HTTP check for ~76 hosts per second in good network conditions (tested in an Google Cloud machine). Depending on how much host have only http (not https) and/or are alive the number of host resolved in average can be higher as the tool doesn't have to perform an double check. In our demo we used an real-world scenario performing resolution for all the `facebook.com` subdomains.
 
 ## Demo
+The hosts file used in the demo is [here](files/hosts.txt).
+
 [![asciicast](https://asciinema.org/a/363640.svg)](https://asciinema.org/a/363640)
 
 # Installation
