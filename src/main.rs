@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::with_name("timeout")
                 .long("timeout")
                 .takes_value(true)
-                .help("Timeout in seconds. Default: 2"),
+                .help("Timeout in seconds. Default: 3"),
         )
         .arg(
             Arg::with_name("user-agent")
@@ -87,8 +87,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         0
     };
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
-    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 2);
+    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
     let user_agent = &value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout))
+        .user_agent(user_agent)
+        .build()?;
 
     // Read stdin
     let mut buffer = String::new();
@@ -96,28 +101,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     stdin.read_to_string(&mut buffer).await?;
     let hosts: Vec<String> = buffer.lines().map(str::to_owned).collect();
 
-    futures::stream::iter(hosts.into_iter().map(|host| async move {
-        let mut response_code = 0;
-        let mut protocol = String::new();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(timeout))
-            .user_agent(user_agent)
-            .build()
-            .unwrap();
-        if let Ok(resp) = client.get(&format!("https://{}", host)).send().await {
-            protocol = "https://".to_string();
-            response_code = resp.status().as_u16();
-        } else if let Ok(resp) = client.get(&format!("http://{}", host)).send().await {
-            protocol = "http://".to_string();
-            response_code = resp.status().as_u16()
-        }
-        if !protocol.is_empty() && conditional_response_code == 0 {
-            println!("{}", protocol + &host)
-        } else if (!protocol.is_empty() && conditional_response_code != 0)
-            && (response_code >= conditional_response_code
-                && response_code <= conditional_response_code + 99)
-        {
-            println!("{}", protocol + &host)
+    futures::stream::iter(hosts.into_iter().map(|host| {
+        // HTTP/HTTP URLs
+        let https_url = format!("https://{}", host);
+        let http_url = format!("http://{}", host);
+        // Create futures
+        let https_send_fut = client.get(&https_url).send();
+        let http_send_fut = client.get(&http_url).send();
+        async move {
+            let mut response_code = 0;
+            let mut valid_url = String::new();
+            if let Ok(resp) = https_send_fut.await {
+                valid_url = https_url.to_string();
+                response_code = resp.status().as_u16();
+            } else if let Ok(resp) = http_send_fut.await {
+                valid_url = http_url.to_string();
+                response_code = resp.status().as_u16()
+            }
+            if !valid_url.is_empty() && conditional_response_code == 0 {
+                println!("{}", valid_url)
+            } else if (!valid_url.is_empty() && conditional_response_code != 0)
+                && (response_code >= conditional_response_code
+                    && response_code <= conditional_response_code + 99)
+            {
+                println!("{}", valid_url)
+            }
         }
     }))
     .buffer_unordered(threads)
