@@ -11,8 +11,8 @@ use {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Eval args
-    let matches = App::new("Fhc")
-        .version("0.1.0")
+    let matches = App::new("FHC")
+        .version(clap::crate_version!())
         .author("Eduard Tolosa <edu4rdshl@protonmail.com>")
         .about("Fast HTTP Checker.")
         .arg(
@@ -34,6 +34,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("user-agent")
                 .takes_value(true)
                 .help("User agent string."),
+        )
+        .arg(
+            Arg::with_name("ignore-certs")
+                .short("i")
+                .long("ignore-certs")
+                .takes_value(false)
+                .help("Accept invalid certificates when checking https. Default: false"),
         )
         .arg(
             Arg::with_name("1xx")
@@ -88,10 +95,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
     let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
-    let user_agent = &value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
+    let user_agent = value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
+    let accept_ivalid_certs = matches.is_present("ignore-certs");
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
+        .danger_accept_invalid_certs(accept_ivalid_certs)
         .user_agent(user_agent)
         .build()?;
 
@@ -103,11 +112,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     futures::stream::iter(hosts.into_iter().map(|host| {
         // HTTP/HTTP URLs
-        let https_url = format!("https://{}", host);
-        let http_url = format!("http://{}", host);
+        let https_url = format!("https://{}/", host);
+        let http_url = format!("http://{}/", host);
         // Create futures
         let https_send_fut = client.get(&https_url).send();
         let http_send_fut = client.get(&http_url).send();
+
         async move {
             let mut response_code = 0;
             let mut valid_url = String::new();
@@ -118,6 +128,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 valid_url = http_url.to_string();
                 response_code = resp.status().as_u16()
             }
+            // Code for debugging issues when needed
+            // match https_send_fut.await {
+            //     Ok(resp) => {
+            //         valid_url = https_url.to_string();
+            //         response_code = resp.status().as_u16();
+            //     }
+            //     Err(e) => {
+            //         println!(
+            //             "Err checking {}, description: {}\n Trying HTTP...",
+            //             https_url, e
+            //         );
+            //         match http_send_fut.await {
+            //             Ok(resp) => {
+            //                 valid_url = http_url.to_string();
+            //                 response_code = resp.status().as_u16();
+            //             }
+            //             Err(e) => println!("Err checking {}, description: {}", http_url, e),
+            //         }
+            //     }
+            // }
             if !valid_url.is_empty() && conditional_response_code == 0 {
                 println!("{}", valid_url)
             } else if (!valid_url.is_empty() && conditional_response_code != 0)
