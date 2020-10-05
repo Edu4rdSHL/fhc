@@ -8,7 +8,7 @@ Offer the community an efficient HTTP checker tool.
 FHC try to resolve https first, if this fails then fallback to http, in that way you don't miss any active HTTP host.
 
 # Performance & speed
-FHC is **very** resource friendly, you can use up to 1000 threads in an single core machine and this will work without any problem, the bottleneck for this tool is your network speed. By default, FHC is able to perform HTTP check for ~76 hosts per second in good network conditions (tested in an Google Cloud machine). Depending on how much host have only http (not https) and/or are alive the number of host resolved in average can be higher as the tool doesn't have to perform an double check. In our demo we used an real-world scenario performing resolution for all the `facebook.com` subdomains.
+FHC is **very** resource friendly, you can use up to 1000 threads in an single core machine and this will work without any problem, the bottleneck for this tool is your network speed. By default, FHC is able to perform HTTP check for ~913 hosts per second in good network conditions (tested in an Google Cloud machine). Depending on how much host have only http (not https) and/or are alive the number of host resolved in average can be low/higher as the tool have or not to perform a double check. In our demo we used an real-world scenario performing resolution for `google.com` subdomains.
 
 ## Demo
 The hosts file used in the demo is [here](files/hosts.txt).
