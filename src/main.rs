@@ -36,13 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("User agent string."),
         )
         .arg(
-            Arg::with_name("ignore-certs")
-                .short("i")
-                .long("ignore-certs")
-                .takes_value(false)
-                .help("Accept invalid certificates when checking https. Default: false"),
-        )
-        .arg(
             Arg::with_name("1xx")
                 .short("1")
                 .long("1xx")
@@ -96,11 +89,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
     let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
     let user_agent = value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
-    let accept_ivalid_certs = matches.is_present("ignore-certs");
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
-        .danger_accept_invalid_certs(accept_ivalid_certs)
+        .danger_accept_invalid_certs(true)
         .user_agent(user_agent)
         .build()?;
 
