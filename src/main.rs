@@ -36,6 +36,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("User agent string."),
         )
         .arg(
+            Arg::with_name("show-codes")
+                .short("s")
+                .long("show-codes")
+                .takes_value(false)
+                .help("Show status codes for discovered hosts."),
+        )
+        .arg(
             Arg::with_name("1xx")
                 .short("1")
                 .long("1xx")
@@ -89,6 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
     let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
     let user_agent = value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
+    let show_status_codes = matches.is_present("show-codes");
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
@@ -140,13 +148,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             //         }
             //     }
             // }
-            if !valid_url.is_empty() && conditional_response_code == 0 {
-                println!("{}", valid_url)
-            } else if (!valid_url.is_empty() && conditional_response_code != 0)
-                && (response_code >= conditional_response_code
-                    && response_code <= conditional_response_code + 99)
+            if (!valid_url.is_empty() && conditional_response_code == 0)
+                || ((!valid_url.is_empty() && conditional_response_code != 0)
+                    && (response_code >= conditional_response_code
+                        && response_code <= conditional_response_code + 99))
             {
-                println!("{}", valid_url)
+                if show_status_codes {
+                    println!("{},{}", valid_url, response_code)
+                } else {
+                    println!("{}", valid_url)
+                }
             }
         }
     }))
