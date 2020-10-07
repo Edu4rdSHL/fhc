@@ -112,8 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     futures::stream::iter(hosts.into_iter().map(|host| {
         // HTTP/HTTP URLs
-        let https_url = format!("https://{}/", host);
-        let http_url = format!("http://{}/", host);
+        let https_url = format!("https://{}", host);
+        let http_url = format!("http://{}", host);
         // Create futures
         let https_send_fut = client.get(&https_url).send();
         let http_send_fut = client.get(&http_url).send();
