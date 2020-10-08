@@ -128,26 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 valid_url = http_url.to_string();
                 response_code = resp.status().as_u16()
             }
-            // Code for debugging issues when needed
-            // match https_send_fut.await {
-            //     Ok(resp) => {
-            //         valid_url = https_url.to_string();
-            //         response_code = resp.status().as_u16();
-            //     }
-            //     Err(e) => {
-            //         println!(
-            //             "Err checking {}, description: {}\n Trying HTTP...",
-            //             https_url, e
-            //         );
-            //         match http_send_fut.await {
-            //             Ok(resp) => {
-            //                 valid_url = http_url.to_string();
-            //                 response_code = resp.status().as_u16();
-            //             }
-            //             Err(e) => println!("Err checking {}, description: {}", http_url, e),
-            //         }
-            //     }
-            // }
+
             if (!valid_url.is_empty() && conditional_response_code == 0)
                 || ((!valid_url.is_empty() && conditional_response_code != 0)
                     && (response_code >= conditional_response_code
