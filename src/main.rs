@@ -122,10 +122,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut response_code = 0;
             let mut valid_url = String::new();
             if let Ok(resp) = https_send_fut.await {
-                valid_url = https_url.to_string();
+                valid_url = https_url;
                 response_code = resp.status().as_u16();
             } else if let Ok(resp) = http_send_fut.await {
-                valid_url = http_url.to_string();
+                valid_url = http_url;
                 response_code = resp.status().as_u16()
             }
 
