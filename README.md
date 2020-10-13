@@ -35,6 +35,12 @@ Download the asset from the [releases page](https://github.com/Edu4rdSHL/fhc/rel
 yay -S fhc
 ```
 
+If you prefer, you can clone the [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=fhc&outdated=&SB=n&SO=a&PP=50&do_Search=Go) and then compile them with [makepkg](https://wiki.archlinux.org/index.php/Makepkg). For example,
+
+```
+git clone https://aur.archlinux.org/fhc.git && cd fhc && makepkg -si
+```
+
 # Usage
 * Show all HTTP urls depite their response codes:
 ```
