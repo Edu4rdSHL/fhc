@@ -27,6 +27,14 @@ Download the asset from the [releases page](https://github.com/Edu4rdSHL/fhc/rel
 2. Clone the repo or download the source code, then run `cargo build --release`.
 3. Execute the tool from `./target/release/fhc` or add it to your system PATH to use from anywhere.
 
+## Using the AUR packages. (Arch Linux)
+
+`fhc` can be installed from available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=fhc&outdated=&SB=n&SO=a&PP=50&do_Search=Go) using an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers). For example,
+
+```
+yay -S fhc
+```
+
 # Usage
 * Show all HTTP urls depite their response codes:
 ```
