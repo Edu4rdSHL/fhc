@@ -45,6 +45,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Target domain."),
         )
         .arg(
+            Arg::with_name("retries")
+                .short("r")
+                .long("retries")
+                .takes_value(true)
+                .help("Max number of http probes per target."),
+        )
+        .arg(
             Arg::with_name("1xx")
                 .short("1")
                 .long("1xx")
@@ -96,6 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         0
     };
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
+    let retries = value_t!(matches.value_of("retries"), usize).unwrap_or_else(|_| 1);
     let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 5);
     let user_agents_list = utils::user_agents();
     let show_status_codes = matches.is_present("show-codes");
@@ -134,7 +142,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         async move {
             let mut response_code = 0;
             let mut valid_url = String::new();
-            if let Ok(resp) = https_send_fut.send().await {
+            if retries != 1 {
+                let mut counter = 0;
+                while counter < retries {
+                    if let Ok(resp) = https_send_fut
+                        .try_clone()
+                        .expect("Failed to clone https future")
+                        .send()
+                        .await
+                    {
+                        valid_url = https_url.clone();
+                        response_code = resp.status().as_u16();
+                        drop(resp)
+                    } else if let Ok(resp) = http_send_fut
+                        .try_clone()
+                        .expect("Failed to clone http future")
+                        .send()
+                        .await
+                    {
+                        valid_url = http_url.clone();
+                        response_code = resp.status().as_u16();
+                        drop(resp)
+                    }
+                    counter += 1
+                }
+            } else if let Ok(resp) = https_send_fut.send().await {
                 valid_url = https_url;
                 response_code = resp.status().as_u16();
                 drop(resp)
