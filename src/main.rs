@@ -1,7 +1,9 @@
+mod utils;
+
 use {
     clap::{value_t, App, Arg},
     futures::stream::StreamExt,
-    reqwest,
+    reqwest::{self, header::USER_AGENT},
     tokio::{
         self,
         io::{self, AsyncReadExt},
@@ -29,18 +31,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Timeout in seconds. Default: 3"),
         )
         .arg(
-            Arg::with_name("user-agent")
-                .short("u")
-                .long("user-agent")
-                .takes_value(true)
-                .help("User agent string."),
-        )
-        .arg(
             Arg::with_name("show-codes")
                 .short("s")
                 .long("show-codes")
                 .takes_value(false)
                 .help("Show status codes for discovered hosts."),
+        )
+        .arg(
+            Arg::with_name("domain")
+                .short("d")
+                .long("domain")
+                .takes_value(true)
+                .help("Target domain."),
         )
         .arg(
             Arg::with_name("1xx")
@@ -94,41 +96,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         0
     };
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
-    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
-    let user_agent = value_t!(matches.value_of("user-agent"), String).unwrap_or_else(|_| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36".to_string());
+    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 5);
+    let user_agents_list = utils::user_agents();
     let show_status_codes = matches.is_present("show-codes");
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
         .danger_accept_invalid_certs(true)
-        .user_agent(user_agent)
         .build()?;
 
     // Read stdin
-    let mut buffer = String::new();
+
     let mut stdin = io::stdin();
+    let mut buffer = String::new();
     stdin.read_to_string(&mut buffer).await?;
-    let hosts: Vec<String> = buffer.lines().map(str::to_owned).collect();
+
+    let hosts: Vec<String> = if matches.is_present("domain") {
+        let domain = value_t!(matches, "domain", String).unwrap();
+        buffer
+            .lines()
+            .map(|word| format!("{}.{}", word, domain))
+            .collect()
+    } else {
+        buffer.lines().map(str::to_owned).collect()
+    };
 
     futures::stream::iter(hosts.into_iter().map(|host| {
+        // Use a random user agent
+        let user_agent = utils::return_random_string(&user_agents_list);
         // HTTP/HTTP URLs
         let https_url = format!("https://{}", host);
         let http_url = format!("http://{}", host);
         // Create futures
-        let https_send_fut = client.get(&https_url).send();
-        let http_send_fut = client.get(&http_url).send();
+        let https_send_fut = client.get(&https_url).header(USER_AGENT, &user_agent);
+        let http_send_fut = client.get(&http_url).header(USER_AGENT, &user_agent);
 
         async move {
             let mut response_code = 0;
             let mut valid_url = String::new();
-            if let Ok(resp) = https_send_fut.await {
+            if let Ok(resp) = https_send_fut.send().await {
                 valid_url = https_url;
                 response_code = resp.status().as_u16();
-            } else if let Ok(resp) = http_send_fut.await {
+                drop(resp)
+            } else if let Ok(resp) = http_send_fut.send().await {
                 valid_url = http_url;
-                response_code = resp.status().as_u16()
+                response_code = resp.status().as_u16();
+                drop(resp)
             }
-
             if (!valid_url.is_empty() && conditional_response_code == 0)
                 || ((!valid_url.is_empty() && conditional_response_code != 0)
                     && (response_code >= conditional_response_code
