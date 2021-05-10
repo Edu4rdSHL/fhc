@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short("d")
                 .long("domain")
                 .takes_value(true)
-                .help("Target domain."),
+                .help("Target domain. When it's specified, a wordlist can be used from stdin for bruteforcing."),
         )
         .arg(
             Arg::with_name("retries")
