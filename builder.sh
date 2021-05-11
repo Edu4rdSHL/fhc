@@ -1,9 +1,10 @@
+#!/usr/bin/env bash
 # Rusolver releaser
 NAME="fhc"
 
 LINUX_TARGET="x86_64-unknown-linux-musl"
 WIN_TARGET="x86_64-pc-windows-gnu"
-RPI_TARGET="armv7-unknown-linux-gnueabihf"
+ARMV7_TARGET="armv7-unknown-linux-gnueabihf"
 AARCH_TARGET="aarch64-unknown-linux-gnu"
 OSX_TARGET="x86_64-apple-darwin"
 MANPAGE_DIR="./$NAME.1"
@@ -26,13 +27,13 @@ else
   echo "Windows artifact build: FAILED"
 fi
 
-# RPi 2-3 build
-echo "Building RPi artifact."
-if cross build -q --release --target="$RPI_TARGET"; then
-  echo "Windows artifact build: SUCCESS"
-  cp "target/$RPI_TARGET/release/$NAME" "target/$RPI_TARGET/release/$NAME-rpi"
+# ARMV7 build
+echo "Building ARMv7 artifact."
+if cross build -q --release --target="$ARMV7_TARGET"; then
+  echo "ARMv7 artifact build: SUCCESS"
+  cp "target/$ARMV7_TARGET/release/$NAME" "target/$ARMV7_TARGET/release/$NAME-armv7"
 else
-  echo "RPi artifact build: FAILED"
+  echo "ARMv7 artifact build: FAILED"
 fi
 
 # Aarch64 build
@@ -54,7 +55,7 @@ else
 fi
 
 echo "Creating manpage..."
-if command -v help2man > /dev/null; then
+if command -v help2man >/dev/null; then
   if help2man -o "$MANPAGE_DIR" "target/$LINUX_TARGET/release/$NAME"; then
     echo "Manpage created sucessfully and saved in $MANPAGE_DIR"
   else
