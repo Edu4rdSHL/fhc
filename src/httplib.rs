@@ -33,9 +33,9 @@ pub async fn return_http_data(
         let https_send_fut = client.get(&https_url).header(USER_AGENT, &user_agent);
         let http_send_fut = client.get(&http_url).header(USER_AGENT, &user_agent);
 
-        async move {
-            let mut http_data = HttpData::default();
+        let mut http_data = HttpData::default();
 
+        async move {
             if retries != 1 {
                 let mut counter = 0;
                 while counter < retries {
