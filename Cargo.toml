@@ -15,6 +15,14 @@ readme = "README.md"
 tokio = { version = "1.6.0", features = ["full", "io-util"] }
 futures = "0.3.15"
 clap = "2.33.3"
-reqwest = { version = "0.11.3", features = ["default-tls"] }
+reqwest = { version = "0.11.3", features = ["trust-dns", "rustls-tls", "native-tls"] }
 openssl = { version = "0.10.34", features = ["vendored"] }
 rand = "0.8.3"
+
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = 'abort'
+incremental = false
+opt-level = "s"

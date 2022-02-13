@@ -1,9 +1,10 @@
-mod utils;
+use std::collections::HashSet;
+
+use fhc::httplib;
 
 use {
     clap::{value_t, App, Arg},
-    futures::stream::StreamExt,
-    reqwest::{self, header::USER_AGENT},
+    fhc::utils,
     tokio::{
         self,
         io::{self, AsyncReadExt},
@@ -22,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short("t")
                 .long("threads")
                 .takes_value(true)
-                .help("Number of threads. Default: 100"),
+                .help("Number of threads. Default: 50"),
         )
         .arg(
             Arg::with_name("timeout")
@@ -102,16 +103,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         0
     };
-    let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 100);
+    let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 50);
     let retries = value_t!(matches.value_of("retries"), usize).unwrap_or_else(|_| 1);
-    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 5);
+    let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
     let user_agents_list = utils::user_agents();
     let show_status_codes = matches.is_present("show-codes");
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(timeout))
-        .danger_accept_invalid_certs(true)
-        .build()?;
+    let client = httplib::return_http_client(timeout);
 
     // Read stdin
 
@@ -119,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = String::new();
     stdin.read_to_string(&mut buffer).await?;
 
-    let hosts: Vec<String> = if matches.is_present("domain") {
+    let hosts: HashSet<String> = if matches.is_present("domain") {
         let domain = value_t!(matches, "domain", String).unwrap();
         buffer
             .lines()
@@ -129,67 +127,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         buffer.lines().map(str::to_owned).collect()
     };
 
-    futures::stream::iter(hosts.into_iter().map(|host| {
-        // Use a random user agent
-        let user_agent = utils::return_random_string(&user_agents_list);
-        // HTTP/HTTP URLs
-        let https_url = format!("https://{}", host);
-        let http_url = format!("http://{}", host);
-        // Create futures
-        let https_send_fut = client.get(&https_url).header(USER_AGENT, &user_agent);
-        let http_send_fut = client.get(&http_url).header(USER_AGENT, &user_agent);
-
-        async move {
-            let mut response_code = 0;
-            let mut valid_url = String::new();
-            if retries != 1 {
-                let mut counter = 0;
-                while counter < retries {
-                    if let Ok(resp) = https_send_fut
-                        .try_clone()
-                        .expect("Failed to clone https future")
-                        .send()
-                        .await
-                    {
-                        valid_url = https_url.clone();
-                        response_code = resp.status().as_u16();
-                        drop(resp)
-                    } else if let Ok(resp) = http_send_fut
-                        .try_clone()
-                        .expect("Failed to clone http future")
-                        .send()
-                        .await
-                    {
-                        valid_url = http_url.clone();
-                        response_code = resp.status().as_u16();
-                        drop(resp)
-                    }
-                    counter += 1
-                }
-            } else if let Ok(resp) = https_send_fut.send().await {
-                valid_url = https_url;
-                response_code = resp.status().as_u16();
-                drop(resp)
-            } else if let Ok(resp) = http_send_fut.send().await {
-                valid_url = http_url;
-                response_code = resp.status().as_u16();
-                drop(resp)
-            }
-            if (!valid_url.is_empty() && conditional_response_code == 0)
-                || ((!valid_url.is_empty() && conditional_response_code != 0)
-                    && (response_code >= conditional_response_code
-                        && response_code <= conditional_response_code + 99))
-            {
-                if show_status_codes {
-                    println!("{},{}", valid_url, response_code)
-                } else {
-                    println!("{}", valid_url)
-                }
-            }
-        }
-    }))
-    .buffer_unordered(threads)
-    .collect::<Vec<()>>()
+    httplib::return_http_data(
+        hosts,
+        client,
+        user_agents_list,
+        retries,
+        threads,
+        conditional_response_code,
+        show_status_codes,
+        false,
+    )
     .await;
+
     Ok(())
 }
