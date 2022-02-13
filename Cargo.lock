@@ -869,9 +869,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.20.2"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d37e5e2290f3e040b594b1a9e04377c2c671f1a1cfd9bfdef82106ac1c113f84"
+checksum = "b323592e3164322f5b193dc4302e4e36cd8d37158a712d664efae1a5c2791700"
 dependencies = [
  "log",
  "ring",
@@ -1189,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-proto"
 version = "0.20.4"
-source = "git+https://github.com/Findomain/trust-dns?branch=custombranch#f05c9a33b59a932b0b2aea115cedd14cc3958b5f"
+source = "git+https://github.com/Findomain/trust-dns?branch=custombranch#f339a5e806bed9109ad205d2143d8b18701d2ab0"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -1213,7 +1213,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-resolver"
 version = "0.20.4"
-source = "git+https://github.com/Findomain/trust-dns?branch=custombranch#f05c9a33b59a932b0b2aea115cedd14cc3958b5f"
+source = "git+https://github.com/Findomain/trust-dns?branch=custombranch#f339a5e806bed9109ad205d2143d8b18701d2ab0"
 dependencies = [
  "cfg-if",
  "futures-util",
