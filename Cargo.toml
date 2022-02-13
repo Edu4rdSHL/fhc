@@ -1,6 +1,6 @@
 [package]
 name = "fhc"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Eduard Tolosa <edu4rdshl@protonmail.com>"]
 edition = "2018"
 description = "Fast HTTP Checker."
@@ -18,6 +18,10 @@ clap = "2.33.4"
 reqwest = { version = "0.11.9", features = ["trust-dns", "rustls-tls", "native-tls"] }
 openssl = { version = "0.10.38", features = ["vendored"] }
 rand = "0.8.4"
+
+# https://github.com/bluejekyll/trust-dns/pull/1632
+[patch.crates-io]
+trust-dns-resolver = { git = "https://github.com/Findomain/trust-dns", package = "trust-dns-resolver", branch = "custombranch" }
 
 
 [profile.release]
