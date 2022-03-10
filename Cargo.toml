@@ -17,7 +17,9 @@ futures = "0.3.21"
 clap = "2.33.4"
 reqwest = { version = "0.11.9", features = ["trust-dns", "rustls-tls", "native-tls"] }
 openssl = { version = "0.10.38", features = ["vendored"] }
-rand = "0.8.4"
+rand = "0.8.5"
+scraper = "0.12.0"
+async-recursion = "1.0.0"
 
 # https://github.com/bluejekyll/trust-dns/pull/1632
 [patch.crates-io]

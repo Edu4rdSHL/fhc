@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let user_agents_list = utils::user_agents();
     let show_status_codes = matches.is_present("show-codes");
 
-    let client = httplib::return_http_client(timeout);
+    let client = httplib::return_http_client(timeout, 3);
 
     // Read stdin
 
@@ -133,6 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_agents_list,
         retries,
         threads,
+        false,
         conditional_response_code,
         show_status_codes,
         false,
