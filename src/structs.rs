@@ -6,7 +6,7 @@ pub struct HTTPFilters {
     pub bad_lines_numbers: Vec<String>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct HttpData {
     pub http_status: String,
     pub status_code: u16,
@@ -21,4 +21,6 @@ pub struct HttpData {
     pub words_count: usize,
     pub lines: usize,
     pub bad_data: HTTPFilters,
+    pub html_file_path: String,
+    pub screenshot_data: Vec<u8>,
 }
