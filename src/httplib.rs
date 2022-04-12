@@ -8,7 +8,7 @@ use reqwest::{
     Client, Response,
 };
 
-use crate::structs::HTTPFilters;
+use crate::structs::{HTTPFilters, LibOptions};
 
 use {
     crate::{structs::HttpData, utils},
@@ -19,67 +19,88 @@ use {
 
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
-pub async fn return_http_data(
-    hosts: HashSet<String>,
-    client: Client,
-    user_agents_list: Vec<String>,
-    retries: usize,
-    mut threads: usize,
-    return_filers: bool,
-    conditional_response_code: u16,
-    show_status_codes: bool,
-    quiet_flag: bool,
-) -> HashMap<String, HttpData> {
-    if hosts.len() < threads {
-        threads = hosts.len();
-    }
+pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData> {
+    let threads = if options.hosts.len() < options.threads {
+        options.hosts.len()
+    } else {
+        options.threads
+    };
 
-    futures::stream::iter(hosts.into_iter().map(|host| {
+    futures::stream::iter(options.hosts.clone().into_iter().map(|host| {
         // Use a random user agent
-        let user_agent = utils::return_random_string(&user_agents_list);
+        let user_agent = utils::return_random_string(&options.user_agents);
         // HTTP/HTTP URLs
         let https_url = format!("https://{}", host);
         let http_url = format!("http://{}", host);
         // Create futures
-        let https_send_fut = client.get(&https_url).header(USER_AGENT, &user_agent);
-        let http_send_fut = client.get(&http_url).header(USER_AGENT, &user_agent);
+        let https_send_fut = options
+            .client
+            .get(&https_url)
+            .header(USER_AGENT, &user_agent);
+        let http_send_fut = options
+            .client
+            .get(&http_url)
+            .header(USER_AGENT, &user_agent);
 
         let mut http_data = HttpData::default();
 
+        let mut is_http = false;
+        let mut response = Option::<Response>::None;
+
         async move {
-            if retries != 1 {
+            if options.retries != 1 {
                 let mut counter = 0;
-                while counter < retries {
+                while counter < options.retries {
                     if let Ok(resp) = https_send_fut
                         .try_clone()
                         .expect("Failed to clone https future")
                         .send()
                         .await
                     {
-                        http_data = assign_response_data(resp, return_filers).await;
+                        response = Some(resp);
+                        break;
                     } else if let Ok(resp) = http_send_fut
                         .try_clone()
                         .expect("Failed to clone http future")
                         .send()
                         .await
                     {
-                        http_data = assign_response_data(resp, return_filers).await;
+                        is_http = true;
+                        response = Some(resp);
+                        break;
                     }
                     counter += 1
                 }
             } else if let Ok(resp) = https_send_fut.send().await {
-                http_data = assign_response_data(resp, return_filers).await;
+                response = Some(resp);
             } else if let Ok(resp) = http_send_fut.send().await {
-                http_data = assign_response_data(resp, return_filers).await;
-            } else {
-                http_data.http_status = "INACTIVE".to_string();
+                is_http = true;
+                response = Some(resp);
             }
-            if !quiet_flag && (!http_data.host_url.is_empty() && conditional_response_code == 0)
-                || ((!http_data.host_url.is_empty() && conditional_response_code != 0)
-                    && (http_data.status_code >= conditional_response_code
-                        && http_data.status_code <= conditional_response_code + 99))
+
+            match response {
+                Some(resp) => {
+                    if options.assign_response_data {
+                        http_data =
+                            assign_response_data(http_data, resp, options.return_filters).await;
+                    } else {
+                        http_data.host_url = if is_http { http_url } else { https_url.clone() };
+                        http_data.status_code = resp.status().as_u16();
+                        http_data.http_status = "ACTIVE".to_string();
+                    };
+                }
+                None => {
+                    http_data.http_status = "INACTIVE".to_string();
+                }
+            };
+
+            if !options.quiet_flag
+                && (!http_data.host_url.is_empty() && options.conditional_response_code == 0)
+                || ((!http_data.host_url.is_empty() && options.conditional_response_code != 0)
+                    && (http_data.status_code >= options.conditional_response_code
+                        && http_data.status_code <= options.conditional_response_code + 99))
             {
-                if show_status_codes {
+                if options.show_status_codes {
                     println!("{},{}", http_data.host_url, http_data.status_code)
                 } else {
                     println!("{}", http_data.host_url)
@@ -105,9 +126,12 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
 }
 
 #[allow(clippy::field_reassign_with_default)]
-pub async fn assign_response_data(resp: Response, return_filers: bool) -> HttpData {
+pub async fn assign_response_data(
+    mut http_data: HttpData,
+    resp: Response,
+    return_filers: bool,
+) -> HttpData {
     let headers = resp.headers().clone();
-    let mut http_data = HttpData::default();
     let mut url = resp.url().to_owned();
 
     http_data.http_status = "ACTIVE".to_string();
@@ -214,18 +238,18 @@ pub async fn return_filters_data(
 
     let threads = urls_to_check.len();
     let mut http_filters = HTTPFilters::default();
-    let data = return_http_data(
-        urls_to_check,
+
+    let lib_options = LibOptions {
+        hosts: urls_to_check,
         client,
-        user_agents_list,
-        1,
+        user_agents: user_agents_list,
+        retries: 1,
         threads,
-        false,
-        0,
-        false,
-        true,
-    )
-    .await;
+        quiet_flag: true,
+        ..Default::default()
+    };
+
+    let data = return_http_data(&lib_options).await;
 
     data.iter()
         .map(|(_, http_data)| {
