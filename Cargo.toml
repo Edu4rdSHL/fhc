@@ -1,6 +1,6 @@
 [package]
 name = "fhc"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Eduard Tolosa <edu4rdshl@protonmail.com>"]
 edition = "2018"
 description = "Fast HTTP Checker."
@@ -12,10 +12,10 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.16.1", features = ["full", "io-util"] }
+tokio = { version = "1.17.0", features = ["full", "io-util"] }
 futures = "0.3.21"
 clap = "2.33.4"
-reqwest = { version = "0.11.9", features = ["trust-dns", "rustls-tls", "native-tls"] }
+reqwest = { version = "0.11.10", features = ["trust-dns", "rustls-tls", "native-tls"] }
 openssl = { version = "0.10.38", features = ["vendored"] }
 rand = "0.8.5"
 scraper = "0.12.0"
@@ -27,7 +27,7 @@ trust-dns-resolver = { git = "https://github.com/Findomain/trust-dns", package =
 
 
 [profile.release]
-lto = true
+lto = 'thin'
 codegen-units = 1
 panic = 'abort'
 incremental = false
