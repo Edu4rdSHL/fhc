@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct HTTPFilters {
@@ -23,4 +25,18 @@ pub struct HttpData {
     pub bad_data: HTTPFilters,
     pub html_file_path: String,
     pub screenshot_data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct LibOptions {
+    pub hosts: HashSet<String>,
+    pub client: reqwest::Client,
+    pub user_agents: Vec<String>,
+    pub retries: usize,
+    pub threads: usize,
+    pub return_filters: bool,
+    pub conditional_response_code: u16,
+    pub show_status_codes: bool,
+    pub assign_response_data: bool,
+    pub quiet_flag: bool,
 }
