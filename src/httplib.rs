@@ -5,7 +5,7 @@ use rand::{distributions::Alphanumeric, thread_rng as rng, Rng};
 use reqwest::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
     redirect::Policy,
-    Client, Response,
+    Client, Response, Url,
 };
 
 use crate::structs::{HTTPFilters, LibOptions};
@@ -29,22 +29,20 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
     futures::stream::iter(options.hosts.clone().into_iter().map(|host| {
         // Use a random user agent
         let user_agent = utils::return_random_string(&options.user_agents);
-        // HTTP/HTTP URLs
-        let https_url = format!("https://{}", host);
-        let http_url = format!("http://{}", host);
+
         // Create futures
         let https_send_fut = options
             .client
-            .get(&https_url)
+            .get(&format!("https://{}", host))
             .header(USER_AGENT, &user_agent);
+
         let http_send_fut = options
             .client
-            .get(&http_url)
+            .get(&format!("http://{}", host))
             .header(USER_AGENT, &user_agent);
 
         let mut http_data = HttpData::default();
 
-        let mut is_http = false;
         let mut response = Option::<Response>::None;
 
         async move {
@@ -65,7 +63,6 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
                         .send()
                         .await
                     {
-                        is_http = true;
                         response = Some(resp);
                         break;
                     }
@@ -74,13 +71,12 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
             } else if let Ok(resp) = https_send_fut.send().await {
                 response = Some(resp);
             } else if let Ok(resp) = http_send_fut.send().await {
-                is_http = true;
                 response = Some(resp);
             }
 
             match response {
                 Some(resp) => {
-                    http_data.host_url = if is_http { http_url } else { https_url.clone() };
+                    http_data.host_url = return_url(resp.url().to_owned()).await;
                     if options.assign_response_data {
                         http_data =
                             assign_response_data(http_data, resp, options.return_filters).await;
@@ -115,14 +111,26 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
 }
 
 pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
+    let policy = if max_redirects == 0 {
+        Policy::none()
+    } else {
+        Policy::limited(max_redirects)
+    };
+
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
-        .redirect(Policy::limited(max_redirects))
+        .redirect(policy)
         .danger_accept_invalid_certs(true)
         .trust_dns(true)
         .use_native_tls()
         .build()
         .expect("Failed to create HTTP client")
+}
+
+pub async fn return_url(mut url: Url) -> String {
+    url.set_path("");
+    url.set_query(None);
+    url.to_string()
 }
 
 #[allow(clippy::field_reassign_with_default)]
