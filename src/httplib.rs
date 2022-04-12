@@ -80,11 +80,11 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
 
             match response {
                 Some(resp) => {
+                    http_data.host_url = if is_http { http_url } else { https_url.clone() };
                     if options.assign_response_data {
                         http_data =
                             assign_response_data(http_data, resp, options.return_filters).await;
                     } else {
-                        http_data.host_url = if is_http { http_url } else { https_url.clone() };
                         http_data.status_code = resp.status().as_u16();
                         http_data.http_status = "ACTIVE".to_string();
                     };
@@ -132,15 +132,11 @@ pub async fn assign_response_data(
     return_filers: bool,
 ) -> HttpData {
     let headers = resp.headers().clone();
-    let mut url = resp.url().to_owned();
+    let url = resp.url().to_owned();
 
     http_data.http_status = "ACTIVE".to_string();
     http_data.status_code = resp.status().as_u16();
-    http_data.host_url = {
-        url.set_path("");
-        url.set_query(None);
-        url.to_string()
-    };
+
     http_data.final_url = url.to_string();
     http_data.protocol = resp.url().scheme().to_string();
     http_data.content_type = if headers.contains_key(CONTENT_TYPE) {
@@ -166,8 +162,8 @@ pub async fn assign_response_data(
         full_body.chars().count() as u64
     };
 
-    http_data.body = return_body(&full_body).await;
-    http_data.title = return_title(&full_body).await;
+    return_title_and_body(&mut http_data, &full_body).await;
+
     http_data.words_count = full_body.split(' ').count();
     http_data.lines = full_body.lines().count() + 1;
 
@@ -181,38 +177,38 @@ pub async fn assign_response_data(
     http_data
 }
 
-pub async fn return_title(data: &str) -> String {
-    let document = Html::parse_document(data);
+pub async fn return_title_and_body(http_data: &mut HttpData, body: &str) {
+    let document = Html::parse_document(body);
+
+    // Return title
     match Selector::parse("title") {
         Ok(selector) => {
             if let Some(title_element) = document.select(&selector).next() {
-                title_element.inner_html()
+                http_data.title = title_element.inner_html()
             } else {
-                "NULL".to_string()
+                http_data.title = "NULL".to_string()
             }
         }
         Err(err) => {
             eprintln!("Failed to parse selector: {:?}", err);
-            String::new()
         }
     }
-}
 
-pub async fn return_body(data: &str) -> String {
-    let document = Html::parse_document(data);
+    // Return body
     match Selector::parse("body") {
         Ok(selector) => {
             if let Some(body_element) = document.select(&selector).next() {
-                body_element.inner_html()
+                http_data.body = body_element.inner_html()
             } else {
-                "NULL".to_string()
+                http_data.body = "NULL".to_string()
             }
         }
         Err(err) => {
             eprintln!("Failed to parse selector: {:?}", err);
-            String::new()
         }
     }
+
+    drop(document);
 }
 
 pub async fn return_filters_data(
@@ -245,6 +241,7 @@ pub async fn return_filters_data(
         user_agents: user_agents_list,
         retries: 1,
         threads,
+        assign_response_data: true,
         quiet_flag: true,
         ..Default::default()
     };
