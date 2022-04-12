@@ -1,6 +1,6 @@
 [package]
 name = "fhc"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Eduard Tolosa <edu4rdshl@protonmail.com>"]
 edition = "2018"
 description = "Fast HTTP Checker."
