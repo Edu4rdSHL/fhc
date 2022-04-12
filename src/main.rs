@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use fhc::httplib;
+use fhc::{httplib, structs::LibOptions};
 
 use {
     clap::{value_t, App, Arg},
@@ -51,6 +51,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("retries")
                 .takes_value(true)
                 .help("Max number of http probes per target."),
+        ).arg(
+            Arg::with_name("max-redirects")
+                .short("L")
+                .long("max-redirects")
+                .takes_value(true)
+                .help("Max number of redirects. Default: 0"),
         )
         .arg(
             Arg::with_name("1xx")
@@ -106,10 +112,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let threads = value_t!(matches.value_of("threads"), usize).unwrap_or_else(|_| 50);
     let retries = value_t!(matches.value_of("retries"), usize).unwrap_or_else(|_| 1);
     let timeout = value_t!(matches.value_of("timeout"), u64).unwrap_or_else(|_| 3);
+    let max_redirects = value_t!(matches.value_of("max-redirects"), usize).unwrap_or_else(|_| 0);
     let user_agents_list = utils::user_agents();
     let show_status_codes = matches.is_present("show-codes");
 
-    let client = httplib::return_http_client(timeout, 3);
+    let client = httplib::return_http_client(timeout, max_redirects);
 
     // Read stdin
 
@@ -127,18 +134,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         buffer.lines().map(str::to_owned).collect()
     };
 
-    httplib::return_http_data(
+    let lib_options = LibOptions {
         hosts,
         client,
-        user_agents_list,
+        user_agents: user_agents_list,
         retries,
         threads,
-        false,
         conditional_response_code,
         show_status_codes,
-        false,
-    )
-    .await;
+        ..Default::default()
+    };
+
+    httplib::return_http_data(&lib_options).await;
 
     Ok(())
 }
