@@ -1,5 +1,6 @@
 use rand::{seq::SliceRandom, thread_rng};
 
+#[must_use]
 pub fn user_agents() -> Vec<String> {
     vec!["Mozilla/5.0 (Windows NT 6.1; WOW64; rv:77.0) Gecko/20190101 Firefox/77.0".to_string(),
     "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:77.0) Gecko/20100101 Firefox/77.0".to_string(),
@@ -32,10 +33,11 @@ pub fn user_agents() -> Vec<String> {
     ]
 }
 
+#[must_use]
 pub fn return_random_string(strings: &[String]) -> String {
-    if strings.is_empty() {
-        String::new()
-    } else {
-        strings.choose(&mut thread_rng()).unwrap().to_string()
-    }
+    let empty_string = String::new();
+    strings
+        .choose(&mut thread_rng())
+        .unwrap_or(&empty_string)
+        .to_string()
 }

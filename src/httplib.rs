@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-
+use crate::structs::{HTTPFilters, LibOptions};
 use async_recursion::async_recursion;
 use rand::{distributions::Alphanumeric, thread_rng as rng, Rng};
 use reqwest::{
@@ -7,9 +6,7 @@ use reqwest::{
     redirect::Policy,
     Client, Response, Url,
 };
-
-use crate::structs::{HTTPFilters, LibOptions};
-
+use std::collections::{HashMap, HashSet};
 use {
     crate::{structs::HttpData, utils},
     futures::stream::StreamExt,
@@ -19,6 +16,7 @@ use {
 
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
+#[must_use]
 pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData> {
     let threads = if options.hosts.len() < options.threads {
         options.hosts.len()
@@ -66,7 +64,7 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
                         response = Some(resp);
                         break;
                     }
-                    counter += 1
+                    counter += 1;
                 }
             } else if let Ok(resp) = https_send_fut.send().await {
                 response = Some(resp);
@@ -76,7 +74,7 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
 
             match response {
                 Some(resp) => {
-                    http_data.host_url = return_url(resp.url().to_owned()).await;
+                    http_data.host_url = return_url(resp.url().clone());
                     if options.assign_response_data {
                         http_data =
                             assign_response_data(http_data, resp, options.return_filters).await;
@@ -97,9 +95,9 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
                         && http_data.status_code <= options.conditional_response_code + 99))
             {
                 if options.show_status_codes {
-                    println!("{},{}", http_data.host_url, http_data.status_code)
+                    println!("{},{}", http_data.host_url, http_data.status_code);
                 } else {
-                    println!("{}", http_data.host_url)
+                    println!("{}", http_data.host_url);
                 }
             }
             (host, http_data)
@@ -110,6 +108,7 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
     .await
 }
 
+#[must_use]
 pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
     let policy = if max_redirects == 0 {
         Policy::none()
@@ -127,7 +126,7 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
         .expect("Failed to create HTTP client")
 }
 
-pub async fn return_url(mut url: Url) -> String {
+#[must_use] pub fn return_url(mut url: Url) -> String {
     url.set_path("");
     url.set_query(None);
     url.to_string()
@@ -140,7 +139,7 @@ pub async fn assign_response_data(
     return_filers: bool,
 ) -> HttpData {
     let headers = resp.headers().clone();
-    let url = resp.url().to_owned();
+    let url = resp.url().clone();
 
     http_data.http_status = "ACTIVE".to_string();
     http_data.status_code = resp.status().as_u16();
@@ -170,7 +169,7 @@ pub async fn assign_response_data(
         full_body.chars().count() as u64
     };
 
-    return_title_and_body(&mut http_data, &full_body).await;
+    return_title_and_body(&mut http_data, &full_body);
 
     http_data.words_count = full_body.split(' ').count();
     http_data.lines = full_body.lines().count() + 1;
@@ -185,16 +184,16 @@ pub async fn assign_response_data(
     http_data
 }
 
-pub async fn return_title_and_body(http_data: &mut HttpData, body: &str) {
+pub fn return_title_and_body(http_data: &mut HttpData, body: &str) {
     let document = Html::parse_document(body);
 
     // Return title
     match Selector::parse("title") {
         Ok(selector) => {
             if let Some(title_element) = document.select(&selector).next() {
-                http_data.title = title_element.inner_html()
+                http_data.title = title_element.inner_html();
             } else {
-                http_data.title = "NULL".to_string()
+                http_data.title = "NULL".to_string();
             }
         }
         Err(err) => {
@@ -206,9 +205,9 @@ pub async fn return_title_and_body(http_data: &mut HttpData, body: &str) {
     match Selector::parse("body") {
         Ok(selector) => {
             if let Some(body_element) = document.select(&selector).next() {
-                http_data.body = body_element.inner_html()
+                http_data.body = body_element.inner_html();
             } else {
-                http_data.body = "NULL".to_string()
+                http_data.body = "NULL".to_string();
             }
         }
         Err(err) => {
