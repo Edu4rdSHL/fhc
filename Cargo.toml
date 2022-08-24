@@ -12,13 +12,13 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.17.0", features = ["full", "io-util"] }
-futures = "0.3.21"
+tokio = { version = "1.20.1", features = ["full", "io-util"] }
+futures = "0.3.23"
 clap = "2.33.4"
-reqwest = { version = "0.11.10", features = ["trust-dns", "rustls-tls", "native-tls"] }
-openssl = { version = "0.10.38", features = ["vendored"] }
+reqwest = { version = "0.11.11", features = ["trust-dns", "rustls-tls", "native-tls"] }
+openssl = { version = "0.10.41", features = ["vendored"] }
 rand = "0.8.5"
-scraper = "0.12.0"
+scraper = "0.13.0"
 async-recursion = "1.0.0"
 
 # https://github.com/bluejekyll/trust-dns/pull/1632
