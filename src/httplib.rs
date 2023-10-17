@@ -1,17 +1,19 @@
-use crate::structs::{HTTPFilters, LibOptions};
-use async_recursion::async_recursion;
-use rand::{distributions::Alphanumeric, thread_rng as rng, Rng};
-use reqwest::{
-    header::{CONTENT_LENGTH, CONTENT_TYPE},
-    redirect::Policy,
-    Client, Response, Url,
-};
-use std::collections::{HashMap, HashSet};
 use {
-    crate::{structs::HttpData, utils},
+    crate::{
+        structs::{HTTPFilters, HttpData, LibOptions},
+        utils,
+    },
+    async_recursion::async_recursion,
     futures::stream::StreamExt,
-    reqwest::{self, header::USER_AGENT},
+    rand::{distributions::Alphanumeric, thread_rng as rng, Rng},
+    reqwest::{
+        self,
+        header::{CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
+        redirect::Policy,
+        Client, Response, Url,
+    },
     scraper::{Html, Selector},
+    std::collections::{HashMap, HashSet},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -31,12 +33,12 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
         // Create futures
         let https_send_fut = options
             .client
-            .get(&format!("https://{}", host))
+            .get(format!("https://{host}"))
             .header(USER_AGENT, &user_agent);
 
         let http_send_fut = options
             .client
-            .get(&format!("http://{}", host))
+            .get(format!("http://{host}"))
             .header(USER_AGENT, &user_agent);
 
         let mut http_data = HttpData::default();
@@ -47,24 +49,18 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
             if options.retries != 1 {
                 let mut counter = 0;
                 while counter < options.retries {
-                    if let Ok(resp) = https_send_fut
-                        .try_clone()
-                        .expect("Failed to clone https future")
-                        .send()
-                        .await
-                    {
-                        response = Some(resp);
-                        break;
-                    } else if let Ok(resp) = http_send_fut
-                        .try_clone()
-                        .expect("Failed to clone http future")
-                        .send()
-                        .await
-                    {
-                        response = Some(resp);
-                        break;
+                    if let Some(resp) = https_send_fut.try_clone() {
+                        if let Ok(resp) = resp.send().await {
+                            response = Some(resp);
+                            break;
+                        }
+                    } else if let Some(resp) = http_send_fut.try_clone() {
+                        if let Ok(resp) = resp.send().await {
+                            response = Some(resp);
+                            break;
+                        }
+                        counter += 1;
                     }
-                    counter += 1;
                 }
             } else if let Ok(resp) = https_send_fut.send().await {
                 response = Some(resp);
@@ -126,7 +122,8 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
         .expect("Failed to create HTTP client")
 }
 
-#[must_use] pub fn return_url(mut url: Url) -> String {
+#[must_use]
+pub fn return_url(mut url: Url) -> String {
     url.set_path("");
     url.set_query(None);
     url.to_string()
@@ -152,10 +149,10 @@ pub async fn assign_response_data(
             .unwrap_or_default()
             .to_string()
     } else {
-        "".to_string()
+        String::new()
     };
 
-    http_data.headers = format!("{:?}", headers);
+    http_data.headers = format!("{headers:?}");
 
     let full_body = resp.text().await.unwrap_or_default();
 
@@ -197,7 +194,7 @@ pub fn return_title_and_body(http_data: &mut HttpData, body: &str) {
             }
         }
         Err(err) => {
-            eprintln!("Failed to parse selector: {:?}", err);
+            eprintln!("Failed to parse selector: {err:?}");
         }
     }
 
@@ -211,7 +208,7 @@ pub fn return_title_and_body(http_data: &mut HttpData, body: &str) {
             }
         }
         Err(err) => {
-            eprintln!("Failed to parse selector: {:?}", err);
+            eprintln!("Failed to parse selector: {err:?}");
         }
     }
 
@@ -255,8 +252,8 @@ pub async fn return_filters_data(
 
     let data = return_http_data(&lib_options).await;
 
-    data.iter()
-        .map(|(_, http_data)| {
+    data.values()
+        .map(|http_data| {
             http_filters
                 .bad_http_lengths
                 .append(&mut vec![http_data.content_length.to_string()]);

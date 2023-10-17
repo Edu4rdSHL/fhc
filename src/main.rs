@@ -1,10 +1,7 @@
-use std::collections::HashSet;
-
-use fhc::{httplib, structs::LibOptions};
-
 use {
     clap::{value_t, App, Arg},
-    fhc::utils,
+    fhc::{httplib, structs::LibOptions, utils},
+    std::collections::HashSet,
     tokio::{
         self,
         io::{self, AsyncReadExt},
@@ -128,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let domain = value_t!(matches, "domain", String).unwrap();
         buffer
             .lines()
-            .map(|word| format!("{}.{}", word, domain))
+            .map(|word| format!("{word}.{domain}"))
             .collect()
     } else {
         buffer.lines().map(str::to_owned).collect()
