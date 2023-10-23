@@ -46,7 +46,7 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
         let mut response = Option::<Response>::None;
 
         async move {
-            if options.retries != 1 {
+            if options.retries > 1 {
                 let mut counter = 0;
                 while counter < options.retries {
                     if let Some(resp) = https_send_fut.try_clone() {
