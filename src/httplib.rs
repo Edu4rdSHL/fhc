@@ -47,8 +47,7 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
 
         async move {
             if options.retries > 1 {
-                let mut counter = 0;
-                while counter < options.retries {
+                for _ in 0..options.retries {
                     if let Some(resp) = https_send_fut.try_clone() {
                         if let Ok(resp) = resp.send().await {
                             response = Some(resp);
@@ -59,7 +58,6 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
                             response = Some(resp);
                             break;
                         }
-                        counter += 1;
                     }
                 }
             } else if let Ok(resp) = https_send_fut.send().await {
