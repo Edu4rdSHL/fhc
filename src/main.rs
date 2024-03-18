@@ -2,10 +2,7 @@ use {
     clap::{value_t, App, Arg},
     fhc::{httplib, structs::LibOptions, utils},
     std::collections::HashSet,
-    tokio::{
-        self,
-        io::{self, AsyncReadExt},
-    },
+    tokio::io::{self, AsyncReadExt},
 };
 
 #[tokio::main]
@@ -54,6 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("max-redirects")
                 .takes_value(true)
                 .help("Max number of redirects. Default: 0"),
+        )
+        .arg(
+            Arg::with_name("bruteforce")
+                .short("b")
+                .long("bruteforce")
+                .takes_value(false)
+                .help("Bruteforce subdomains."),
         )
         .arg(
             Arg::with_name("1xx")
@@ -115,20 +119,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = httplib::return_http_client(timeout, max_redirects);
 
-    // Read stdin
-
-    let mut stdin = io::stdin();
     let mut buffer = String::new();
-    stdin.read_to_string(&mut buffer).await?;
 
-    let hosts: HashSet<String> = if matches.is_present("domain") {
+    let mut hosts = HashSet::new();
+
+    if matches.is_present("domain") {
         let domain = value_t!(matches, "domain", String).unwrap();
-        buffer
-            .lines()
-            .map(|word| format!("{word}.{domain}"))
-            .collect()
+        if matches.is_present("bruteforce") {
+            io::stdin().read_to_string(&mut buffer).await?;
+            hosts = buffer
+                .lines()
+                .map(|word| format!("{word}.{domain}"))
+                .collect();
+        } else {
+            hosts.insert(domain);
+        }
     } else {
-        buffer.lines().map(str::to_owned).collect()
+        io::stdin().read_to_string(&mut buffer).await?;
+        hosts = buffer.lines().map(str::to_owned).collect();
     };
 
     let lib_options = LibOptions {

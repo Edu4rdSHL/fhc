@@ -7,7 +7,6 @@ use {
     futures::stream::StreamExt,
     rand::{distributions::Alphanumeric, thread_rng as rng, Rng},
     reqwest::{
-        self,
         header::{CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
         redirect::Policy,
         Client, Response, Url,
