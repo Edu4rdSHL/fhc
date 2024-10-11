@@ -3,94 +3,80 @@ use {
         structs::{HTTPFilters, HttpData, LibOptions},
         utils,
     },
-    async_recursion::async_recursion,
     futures::stream::StreamExt,
     rand::{distributions::Alphanumeric, thread_rng as rng, Rng},
     reqwest::{
         header::{CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
         redirect::Policy,
-        Client, Response, Url,
+        Client, Response,
     },
     scraper::{Html, Selector},
     std::collections::{HashMap, HashSet},
 };
 
-#[allow(clippy::too_many_arguments)]
-#[async_recursion]
 #[must_use]
 pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData> {
-    let threads = if options.hosts.len() < options.threads {
-        options.hosts.len()
-    } else {
-        options.threads
-    };
+    let threads = options.hosts.len().min(options.threads);
+
+    let filter_codes = options.filter_codes.as_deref().unwrap_or_default();
+    let exclude_codes = options.exclude_codes.as_deref().unwrap_or_default();
 
     futures::stream::iter(options.hosts.clone().into_iter().map(|host| {
-        // Use a random user agent
-        let user_agent = utils::return_random_string(&options.user_agents);
-
-        // Create futures
-        let https_send_fut = options
-            .client
-            .get(format!("https://{host}"))
-            .header(USER_AGENT, &user_agent);
-
-        let http_send_fut = options
-            .client
-            .get(format!("http://{host}"))
-            .header(USER_AGENT, &user_agent);
-
-        let mut http_data = HttpData::default();
-
-        let mut response = Option::<Response>::None;
+        let user_agent = utils::return_random_user_agent(&options.user_agents);
 
         async move {
-            if options.retries > 1 {
-                for _ in 0..options.retries {
-                    if let Some(resp) = https_send_fut.try_clone() {
-                        if let Ok(resp) = resp.send().await {
-                            response = Some(resp);
-                            break;
-                        }
-                    } else if let Some(resp) = http_send_fut.try_clone() {
-                        if let Ok(resp) = resp.send().await {
-                            response = Some(resp);
-                            break;
-                        }
-                    }
+            let mut http_data = HttpData::default();
+            let mut response = None;
+
+            // Attempt both HTTPS and HTTP requests, retry if necessary
+            for _ in 0..options.retries {
+                let https_req = options
+                    .client
+                    .get(format!("https://{}", host))
+                    .header(USER_AGENT, &user_agent)
+                    .send();
+
+                let http_req = options
+                    .client
+                    .get(format!("http://{}", host))
+                    .header(USER_AGENT, &user_agent)
+                    .send();
+
+                response = https_req.await.or(http_req.await).ok();
+
+                if response.is_some() {
+                    break;
                 }
-            } else if let Ok(resp) = https_send_fut.send().await {
-                response = Some(resp);
-            } else if let Ok(resp) = http_send_fut.send().await {
-                response = Some(resp);
             }
 
-            match response {
-                Some(resp) => {
-                    http_data.host_url = return_url(resp.url().clone());
-                    if options.assign_response_data {
-                        http_data =
-                            assign_response_data(http_data, resp, options.return_filters).await;
-                    } else {
-                        http_data.status_code = resp.status().as_u16();
-                        http_data.http_status = "ACTIVE".to_string();
-                    };
+            if let Some(resp) = response {
+                http_data.checked_host = host.clone();
+                http_data.final_url = resp.url().to_string();
+
+                if options.assign_response_data {
+                    http_data = assign_response_data(http_data, resp, options.return_filters).await;
+                } else {
+                    http_data.status_code = resp.status().as_u16();
+                    http_data.http_status = "ACTIVE".to_string();
                 }
-                None => {
-                    http_data.http_status = "INACTIVE".to_string();
-                }
-            };
+            } else {
+                http_data.http_status = "INACTIVE".to_string();
+            }
 
             if !options.quiet_flag
-                && (!http_data.host_url.is_empty() && options.conditional_response_code == 0)
-                || ((!http_data.host_url.is_empty() && options.conditional_response_code != 0)
-                    && (http_data.status_code >= options.conditional_response_code
-                        && http_data.status_code <= options.conditional_response_code + 99))
+                && !http_data.checked_host.is_empty()
+                && (filter_codes.is_empty()
+                    || filter_codes.contains(&http_data.status_code.to_string()))
+                && (exclude_codes.is_empty()
+                    || !exclude_codes.contains(&http_data.status_code.to_string()))
             {
                 if options.show_status_codes {
-                    println!("{},{}", http_data.host_url, http_data.status_code);
+                    println!(
+                        "{},[{}],[{}]",
+                        http_data.checked_host, http_data.final_url, http_data.status_code
+                    );
                 } else {
-                    println!("{}", http_data.host_url);
+                    println!("{},[{}]", http_data.checked_host, http_data.final_url);
                 }
             }
             (host, http_data)
@@ -113,62 +99,45 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
         .timeout(std::time::Duration::from_secs(timeout))
         .redirect(policy)
         .danger_accept_invalid_certs(true)
-        .trust_dns(true)
         .use_native_tls()
         .build()
         .expect("Failed to create HTTP client")
-}
-
-#[must_use]
-pub fn return_url(mut url: Url) -> String {
-    url.set_path("");
-    url.set_query(None);
-    url.to_string()
 }
 
 #[allow(clippy::field_reassign_with_default)]
 pub async fn assign_response_data(
     mut http_data: HttpData,
     resp: Response,
-    return_filers: bool,
+    return_filters: bool,
 ) -> HttpData {
     let headers = resp.headers().clone();
     let url = resp.url().clone();
 
     http_data.http_status = "ACTIVE".to_string();
     http_data.status_code = resp.status().as_u16();
-
     http_data.final_url = url.to_string();
-    http_data.protocol = resp.url().scheme().to_string();
-    http_data.content_type = if headers.contains_key(CONTENT_TYPE) {
-        headers[CONTENT_TYPE]
-            .to_str()
-            .unwrap_or_default()
-            .to_string()
-    } else {
-        String::new()
-    };
+    http_data.protocol = url.scheme().to_string();
+    http_data.content_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+
+    let full_body = (resp.text().await).unwrap_or_default();
+
+    http_data.content_length = headers
+        .get(CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok()?.parse().ok())
+        .unwrap_or_else(|| full_body.chars().count() as u64);
 
     http_data.headers = format!("{headers:?}");
 
-    let full_body = resp.text().await.unwrap_or_default();
-
-    http_data.content_length = if headers.contains_key(CONTENT_LENGTH) {
-        headers[CONTENT_LENGTH]
-            .to_str()
-            .unwrap_or_default()
-            .parse()
-            .unwrap_or_default()
-    } else {
-        full_body.chars().count() as u64
-    };
-
     return_title_and_body(&mut http_data, &full_body);
 
-    http_data.words_count = full_body.split(' ').count();
+    http_data.words_count = full_body.split_whitespace().count();
     http_data.lines = full_body.lines().count() + 1;
 
-    if return_filers {
+    if return_filters {
         let host = url.host_str().unwrap_or_default();
         let client = return_http_client(5, 3);
         let user_agents = utils::user_agents();

@@ -12,7 +12,7 @@ pub struct HTTPFilters {
 pub struct HttpData {
     pub http_status: String,
     pub status_code: u16,
-    pub host_url: String,
+    pub checked_host: String,
     pub final_url: String,
     pub protocol: String,
     pub title: String,
@@ -35,7 +35,8 @@ pub struct LibOptions {
     pub retries: usize,
     pub threads: usize,
     pub return_filters: bool,
-    pub conditional_response_code: u16,
+    pub filter_codes: Option<String>,
+    pub exclude_codes: Option<String>,
     pub show_status_codes: bool,
     pub assign_response_data: bool,
     pub quiet_flag: bool,

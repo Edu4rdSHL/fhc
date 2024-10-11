@@ -34,7 +34,7 @@ pub fn user_agents() -> Vec<String> {
 }
 
 #[must_use]
-pub fn return_random_string(strings: &[String]) -> String {
+pub fn return_random_user_agent(strings: &[String]) -> String {
     let empty_string = String::new();
     strings
         .choose(&mut thread_rng())
