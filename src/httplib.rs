@@ -15,7 +15,7 @@ use {
 };
 
 #[must_use]
-pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData> {
+pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<String, HttpData> {
     let threads = options.hosts.len().min(options.threads);
 
     let filter_codes = options.filter_codes.as_deref().unwrap_or_default();
@@ -25,7 +25,10 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
         let user_agent = utils::return_random_user_agent(&options.user_agents);
 
         async move {
-            let mut http_data = HttpData::default();
+            let mut http_data = HttpData {
+                checked_host: host.clone(),
+                ..Default::default()
+            };
             let mut response = None;
 
             // Attempt both HTTPS and HTTP requests, retry if necessary
@@ -50,33 +53,32 @@ pub async fn return_http_data(options: &LibOptions) -> HashMap<String, HttpData>
             }
 
             if let Some(resp) = response {
-                http_data.checked_host = host.clone();
+                // Those are always set
+                http_data.protocol = resp.url().scheme().to_string();
+                http_data.status_code = resp.status().as_u16();
                 http_data.final_url = resp.url().to_string();
 
-                if options.assign_response_data {
-                    http_data = assign_response_data(http_data, resp, options.return_filters).await;
-                } else {
-                    http_data.status_code = resp.status().as_u16();
-                    http_data.http_status = "ACTIVE".to_string();
+                if !from_cli {
+                    assign_response_data(&mut http_data, resp, options.return_filters).await;
                 }
             } else {
                 http_data.http_status = "INACTIVE".to_string();
             }
 
             if !options.quiet_flag
-                && !http_data.checked_host.is_empty()
+                && !http_data.final_url.is_empty()
                 && (filter_codes.is_empty()
                     || filter_codes.contains(&http_data.status_code.to_string()))
                 && (exclude_codes.is_empty()
                     || !exclude_codes.contains(&http_data.status_code.to_string()))
             {
-                if options.show_status_codes {
+                if options.show_full_data {
                     println!(
                         "{},[{}],[{}]",
                         http_data.checked_host, http_data.final_url, http_data.status_code
                     );
                 } else {
-                    println!("{},[{}]", http_data.checked_host, http_data.final_url);
+                    println!("{}://{}", http_data.protocol, http_data.checked_host);
                 }
             }
             (host, http_data)
@@ -105,18 +107,11 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
 }
 
 #[allow(clippy::field_reassign_with_default)]
-pub async fn assign_response_data(
-    mut http_data: HttpData,
-    resp: Response,
-    return_filters: bool,
-) -> HttpData {
+pub async fn assign_response_data(http_data: &mut HttpData, resp: Response, return_filters: bool) {
     let headers = resp.headers().clone();
     let url = resp.url().clone();
 
     http_data.http_status = "ACTIVE".to_string();
-    http_data.status_code = resp.status().as_u16();
-    http_data.final_url = url.to_string();
-    http_data.protocol = url.scheme().to_string();
     http_data.content_type = headers
         .get(CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -132,10 +127,11 @@ pub async fn assign_response_data(
 
     http_data.headers = format!("{headers:?}");
 
-    return_title_and_body(&mut http_data, &full_body);
+    return_title_and_body(http_data, &full_body);
 
     http_data.words_count = full_body.split_whitespace().count();
     http_data.lines = full_body.lines().count() + 1;
+    http_data.points_to_another_host = url.host_str() != Some(&http_data.checked_host);
 
     if return_filters {
         let host = url.host_str().unwrap_or_default();
@@ -143,8 +139,6 @@ pub async fn assign_response_data(
         let user_agents = utils::user_agents();
         http_data.bad_data = return_filters_data(host, client, user_agents).await;
     }
-
-    http_data
 }
 
 pub fn return_title_and_body(http_data: &mut HttpData, body: &str) {
@@ -211,12 +205,11 @@ pub async fn return_filters_data(
         user_agents: user_agents_list,
         retries: 1,
         threads,
-        assign_response_data: true,
         quiet_flag: true,
         ..Default::default()
     };
 
-    let data = return_http_data(&lib_options).await;
+    let data = return_http_data(&lib_options, false).await;
 
     data.values()
         .map(|http_data| {

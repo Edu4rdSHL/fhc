@@ -25,6 +25,7 @@ pub struct HttpData {
     pub bad_data: HTTPFilters,
     pub html_file_path: String,
     pub screenshot_data: Vec<u8>,
+    pub points_to_another_host: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -37,7 +38,6 @@ pub struct LibOptions {
     pub return_filters: bool,
     pub filter_codes: Option<String>,
     pub exclude_codes: Option<String>,
-    pub show_status_codes: bool,
-    pub assign_response_data: bool,
+    pub show_full_data: bool,
     pub quiet_flag: bool,
 }

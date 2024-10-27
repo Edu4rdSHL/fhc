@@ -10,19 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Eval args
     let args = args::Cli::parse();
 
-    let filter_codes = args.filter_codes;
-    let exclude_codes = args.exclude_codes;
-    let threads = args.threads;
-    let retries = args.retries;
-    let timeout = args.timeout;
-    let max_redirects = args.max_redirects;
-    let user_agents_list = utils::user_agents();
-    let show_status_codes = args.show_codes;
-
-    let client = httplib::return_http_client(timeout, max_redirects);
-
     let mut buffer = String::new();
-
     let mut hosts = HashSet::new();
 
     if args.domain.is_some() {
@@ -43,25 +31,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let lib_options = LibOptions {
         hosts,
-        client,
-        user_agents: user_agents_list,
-        retries,
-        threads,
-        filter_codes,
-        exclude_codes,
-        show_status_codes,
+        client: httplib::return_http_client(args.timeout, args.max_redirects),
+        user_agents: utils::user_agents(),
+        retries: args.retries,
+        threads: args.threads,
+        filter_codes: args.filter_codes,
+        exclude_codes: args.exclude_codes,
+        show_full_data: args.show_full_data,
         ..Default::default()
     };
 
-    if !args.quiet {
-        if show_status_codes {
-            println!("DOMAIN,[FINAL_URL],[STATUS_CODE]");
-        } else {
-            println!("DOMAIN,[FINAL_URL]");
-        }
+    if !args.quiet && args.show_full_data {
+        println!("DOMAIN,[FINAL_URL],[STATUS_CODE]");
     }
 
-    let _ = httplib::return_http_data(&lib_options).await;
+    let _ = httplib::return_http_data(&lib_options, true).await;
 
     Ok(())
 }
