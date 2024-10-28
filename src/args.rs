@@ -18,8 +18,8 @@ pub struct Cli {
     #[clap(short, long, default_value = "1")]
     /// Number of retries
     pub retries: usize,
-    #[clap(short = 'L', long, default_value = "10")]
-    /// Maximum number of redirects
+    #[clap(short = 'L', long, default_value = "0")]
+    /// Maximum number of redirects, disabled by default.
     pub max_redirects: usize,
     #[clap(short, long)]
     /// Enable bruteforce mode
