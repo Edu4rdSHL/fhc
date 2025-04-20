@@ -35,13 +35,13 @@ pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<S
             for _ in 0..options.retries {
                 let https_req = options
                     .client
-                    .get(format!("https://{}", host))
+                    .get(format!("https://{host}"))
                     .header(USER_AGENT, &user_agent)
                     .send();
 
                 let http_req = options
                     .client
-                    .get(format!("http://{}", host))
+                    .get(format!("http://{host}"))
                     .header(USER_AGENT, &user_agent)
                     .send();
 

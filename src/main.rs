@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         io::stdin().read_to_string(&mut buffer).await?;
         hosts = buffer.lines().map(str::to_owned).collect();
-    };
+    }
 
     let lib_options = LibOptions {
         hosts,
