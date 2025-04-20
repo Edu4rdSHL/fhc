@@ -12,15 +12,15 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.41.0", features = ["full", "io-util"] }
+tokio = { version = "1.44.2", features = ["full", "io-util"] }
 futures = "0.3.31"
-clap = { version = "4.5.20", features = ["derive"] }
-reqwest = { version = "0.12.8", features = [
+clap = { version = "4.5.37", features = ["derive"] }
+reqwest = { version = "0.12.15", features = [
     "hickory-dns",
     "rustls-tls",
     "native-tls",
 ] }
-openssl = { version = "0.10.68", features = ["vendored"] }
+openssl = { version = "0.10.72", features = ["vendored"] }
 rand = "0.8.5"
 scraper = "0.20.0"
 async-recursion = "1.1.1"
