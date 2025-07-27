@@ -22,17 +22,13 @@ pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<S
     let filter_codes = options.filter_codes.as_deref().unwrap_or_default();
     let exclude_codes = options.exclude_codes.as_deref().unwrap_or_default();
 
-    futures::stream::iter(options.hosts.clone().into_iter().map(|host| {
+    futures::stream::iter(options.hosts.iter().map(|host| {
         let user_agent = utils::return_random_user_agent(&options.user_agents);
 
         async move {
-            let mut http_data = HttpData {
-                checked_host: host.clone(),
-                ..Default::default()
-            };
+            let mut http_data = HttpData::new(host.clone());
             let mut response = None;
 
-            // Attempt both HTTPS and HTTP requests, retry if necessary
             for _ in 0..options.retries {
                 let https_req = options
                     .client
@@ -46,7 +42,10 @@ pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<S
                     .header(USER_AGENT, &user_agent)
                     .send();
 
-                response = https_req.await.or(http_req.await).ok();
+                response = tokio::select! {
+                    https_result = https_req => https_result.ok(),
+                    http_result = http_req => http_result.ok(),
+                };
 
                 if response.is_some() {
                     break;
@@ -73,16 +72,26 @@ pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<S
                 && (exclude_codes.is_empty()
                     || !exclude_codes.contains(&http_data.status_code.to_string()))
             {
+                // Use faster I/O for high-throughput scenarios
+                use std::io::{self, Write};
+                let stdout = io::stdout();
+                let mut handle = stdout.lock();
+
                 if options.show_full_data {
-                    println!(
+                    let _ = writeln!(
+                        handle,
                         "{},[{}],[{}]",
                         http_data.checked_host, http_data.final_url, http_data.status_code
                     );
                 } else {
-                    println!("{}://{}", http_data.protocol, http_data.checked_host);
+                    let _ = writeln!(
+                        handle,
+                        "{}://{}",
+                        http_data.protocol, http_data.checked_host
+                    );
                 }
             }
-            (host, http_data)
+            (host.clone(), http_data)
         }
     }))
     .buffer_unordered(threads)
@@ -103,6 +112,9 @@ pub fn return_http_client(timeout: u64, max_redirects: usize) -> Client {
         .redirect(policy)
         .danger_accept_invalid_certs(true)
         .use_native_tls()
+        .pool_max_idle_per_host(50)
+        .pool_idle_timeout(std::time::Duration::from_secs(30))
+        .tcp_keepalive(std::time::Duration::from_secs(60))
         .build()
         .expect("Failed to create HTTP client")
 }
@@ -119,7 +131,14 @@ pub async fn assign_response_data(http_data: &mut HttpData, resp: Response, retu
         .unwrap_or_default()
         .to_string();
 
-    let full_body = (resp.text().await).unwrap_or_default();
+    let full_body = {
+        const MAX_BODY_SIZE: usize = 1024 * 1024; // 1MB limit
+        match resp.text().await {
+            Ok(text) if text.len() <= MAX_BODY_SIZE => text,
+            Ok(text) => text.chars().take(MAX_BODY_SIZE).collect(),
+            Err(_) => String::new(),
+        }
+    };
 
     http_data.content_length = headers
         .get(CONTENT_LENGTH)
@@ -130,8 +149,11 @@ pub async fn assign_response_data(http_data: &mut HttpData, resp: Response, retu
 
     return_title_and_body(http_data, &full_body);
 
-    http_data.words_count = full_body.split_whitespace().count();
-    http_data.lines = full_body.lines().count() + 1;
+    let lines_count = full_body.lines().count();
+    let words_count = full_body.split_whitespace().count();
+
+    http_data.words_count = words_count;
+    http_data.lines = lines_count + 1;
     http_data.points_to_another_host = url.host_str() != Some(&http_data.checked_host);
 
     if return_filters {
@@ -145,35 +167,24 @@ pub async fn assign_response_data(http_data: &mut HttpData, resp: Response, retu
 pub fn return_title_and_body(http_data: &mut HttpData, body: &str) {
     let document = Html::parse_document(body);
 
-    // Return title
-    match Selector::parse("title") {
-        Ok(selector) => {
-            if let Some(title_element) = document.select(&selector).next() {
-                http_data.title = title_element.inner_html();
-            } else {
-                http_data.title = "NULL".to_string();
-            }
-        }
-        Err(err) => {
-            eprintln!("Failed to parse selector: {err:?}");
-        }
+    let title_selector = Selector::parse("title").ok();
+    let body_selector = Selector::parse("body").ok();
+
+    if let Some(title_sel) = &title_selector {
+        http_data.title = document
+            .select(title_sel)
+            .next()
+            .map(|element| element.inner_html())
+            .unwrap_or_else(|| "NULL".to_string());
     }
 
-    // Return body
-    match Selector::parse("body") {
-        Ok(selector) => {
-            if let Some(body_element) = document.select(&selector).next() {
-                http_data.body = body_element.inner_html();
-            } else {
-                http_data.body = "NULL".to_string();
-            }
-        }
-        Err(err) => {
-            eprintln!("Failed to parse selector: {err:?}");
-        }
+    if let Some(body_sel) = &body_selector {
+        http_data.body = document
+            .select(body_sel)
+            .next()
+            .map(|element| element.inner_html())
+            .unwrap_or_else(|| "NULL".to_string());
     }
-
-    drop(document);
 }
 
 pub async fn return_filters_data(
@@ -212,21 +223,17 @@ pub async fn return_filters_data(
 
     let data = return_http_data(&lib_options, false).await;
 
-    data.values()
-        .map(|http_data| {
-            http_filters
-                .bad_http_lengths
-                .append(&mut vec![http_data.content_length.to_string()]);
-            http_filters.bad_words_numbers.append(&mut vec![http_data
-                .body
-                .split(' ')
-                .count()
-                .to_string()]);
-            http_filters
-                .bad_lines_numbers
-                .append(&mut vec![http_data.lines.to_string()]);
-        })
-        .for_each(drop);
+    data.values().for_each(|http_data| {
+        http_filters
+            .bad_http_lengths
+            .push(http_data.content_length.to_string());
+        http_filters
+            .bad_words_numbers
+            .push(http_data.words_count.to_string());
+        http_filters
+            .bad_lines_numbers
+            .push(http_data.lines.to_string());
+    });
 
     http_filters
 }

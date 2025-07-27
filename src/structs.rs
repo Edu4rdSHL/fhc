@@ -28,6 +28,16 @@ pub struct HttpData {
     pub points_to_another_host: bool,
 }
 
+impl HttpData {
+    #[inline]
+    pub fn new(host: String) -> Self {
+        Self {
+            checked_host: host,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct LibOptions {
     pub hosts: HashSet<String>,
