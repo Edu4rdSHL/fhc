@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{rng, seq::IndexedRandom};
 
 #[must_use]
 pub fn user_agents() -> Vec<String> {
@@ -37,7 +37,7 @@ pub fn user_agents() -> Vec<String> {
 pub fn return_random_user_agent(strings: &[String]) -> String {
     let empty_string = String::new();
     strings
-        .choose(&mut thread_rng())
+        .choose(&mut rng())
         .unwrap_or(&empty_string)
         .to_string()
 }

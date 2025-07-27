@@ -4,7 +4,7 @@ use {
         utils,
     },
     futures::stream::StreamExt,
-    rand::{distributions::Alphanumeric, thread_rng as rng, Rng},
+    rand::{distr::Alphanumeric, rng, Rng},
     reqwest::{
         header::{CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
         redirect::Policy,
@@ -15,6 +15,7 @@ use {
 };
 
 #[must_use]
+#[allow(clippy::similar_names)]
 pub async fn return_http_data(options: &LibOptions, from_cli: bool) -> HashMap<String, HttpData> {
     let threads = options.hosts.len().min(options.threads);
 
