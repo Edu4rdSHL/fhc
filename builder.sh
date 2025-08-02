@@ -10,17 +10,9 @@ AARCH_TARGET="aarch64-unknown-linux-gnu"
 MANPAGE_DIR="./$NAME.1"
 BIN_OUTPUT_DIR="./ghbinaries"
 
-if ! systemctl is-active docker >/dev/null 2>&1; then
-  echo "Docker is not running. Starting docker."
-  if ! sudo systemctl start docker; then
-    echo "Failed to start docker."
-    exit 1
-  fi
-fi
-
 # Linux build
 echo "Building Linux artifact."
-if cargo build -q --release --target="$LINUX_TARGET"; then
+if cross build -q --release --target="$LINUX_TARGET"; then
   echo "Linux artifact build: SUCCESS"
   cp "target/$LINUX_TARGET/release/$NAME" "target/$LINUX_TARGET/release/$NAME-linux"
   strip "target/$LINUX_TARGET/release/$NAME-linux"
